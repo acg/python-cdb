@@ -1,0 +1,50 @@
+python-cdb ChangeLog
+MJ Pomraning <mjp@pilcrow.madison.wi.us>
+26 Jan 2002
+
+26 Jan 2002
+  - Version 0.32
+  - fix cdb.init() occasional memory corruption
+    thx: Jason Mastaler
+  - getnext() unbroken
+    thx: <wang@rjka.com>
+  - Example updated
+
+15 Jan 2002
+  - Version 0.31; BSDish EPROTO fix
+    thx: Jason Mastaler <jason@mastaler.com>
+
+10 Jan 2002
+  - Version 0.30; GPL
+  - cdb.error Exception introduced
+  - libc analogs of DJB funcs (mostly stdio), and libowfat (GPL) uint*
+    implementation; shed cdb-0.75 tarball; distutils build now tolerable
+  - cdb_pyread improvement; fixed memory leak concerning cdb_make_finish
+    fixed
+  - small doc corrections
+
+02 Apr 2001
+  - PyMem_{Malloc,Free} API change for 2.x 
+    thx: Ben Beuchler <insyte@emt-p.org>
+  - _wrap_cdb_read():  raise Exception, avoid unneeded PyMem_Malloc
+
+13 Mar 2001
+  - Version 0.21;
+  - setup.py (yay!); c.l.py.a announcement
+  - small doc improvements
+
+12 Mar 2001
+  - Version 0.20; public release
+  - fd member to -1 on cdbmake finish()
+  - PyString attr refcount oversight corrected
+  - objects, functions, module __doc__
+  - code reorg.
+
+05 Mar 2001
+  - extended cdb_o constructor: fd or fn
+  - proper close() in cdb destructor
+  - unlink cm.fntmp if cm deallocated but unfinish()ed
+  - cdb_o methods __doc__
+
+beginnings
+  - cdb.py wrapper around _cdbmodule.so

@@ -1,0 +1,16 @@
+MANIFEST
+ChangeLog
+Example
+README
+COPYING
+setup.py
+setup.cfg
+src/cdb.c
+src/cdb.h
+src/cdb_make.c
+src/cdb_make.h
+src/cdb_hash.c
+src/uint32_pack.c
+src/uint32_unpack.c
+src/cdbmodule.c
+src/uint32.h

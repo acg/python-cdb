@@ -1,0 +1,66 @@
+#! /usr/bin/env python
+
+# python-cdb 0.32 "Example"
+
+import cdb
+
+print cdb.__version__
+
+## cdbmake object
+
+fn = "f.cdb"
+
+maker = cdb.cdbmake(fn, fn + ".tmp");
+
+maker.add('flim', 'flam')        # +4,4:flim->flam
+maker.add('map', 'hash')         # +3,4:map->hash
+maker.add('spam', 'eggs')        # +4,4:spam->eggs
+maker.add('map', 'dictionary')   # +3,10:map->dictionary
+maker.add('map', 'assoc. array') # +3,12:map->assoc. array
+
+print "Added %d records to CDB %s (fd %d)" % \
+      (maker.numentries, maker.fn, maker.fd)
+
+maker.finish()
+
+del(maker)
+
+## cdb object
+
+c = cdb.init(fn)             # or init( file_obj.fileno() )
+
+print len(c)                 # 5
+
+print c['flim']              # 'flam'
+print c.get('spam')          # 'eggs'
+print c.get('map', 0)        # 'hash' -- a la cdbget utility
+print c.get('map', 1)        # 'dictionary'
+
+r = c.get('map')             # will print:
+while r is not None:         #   'hash'
+    print r                  #   'dictionary'
+    r = c.getnext()          #   'assoc. array'
+
+print c.keys()               # ['flim', 'map', 'spam']
+
+for k in c.keys():           # flim => ['flam']
+  print k, '=>', c.getall(k) # map => ['hash', 'dictionary', 'assoc. array']
+                             # spam => ['eggs']
+
+k = c.firstkey()             # same as above
+while k is not None:
+    print k, "=>", c.getall(k)
+    k = c.nextkey()
+
+
+def cdbdump(cdb_o):          # as the cdbdump utility
+    r = cdb_o.each()         # r = ('key', 'val') or None
+    while r:
+        print "+%d,%d:%s->%s" % (
+              len(r[0]), len(r[1]),
+              r[0], r[1] )
+        r = cdb_o.each()
+    print
+
+
+cdbdump(c)
