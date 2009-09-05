@@ -1,9 +1,5 @@
 #! /usr/bin/env python
 
-# MJ Pomraning <mjp@pilcrow.madison.wi.us>
-# 26 Jan 2001
-# python-cdb 0.32 setup.py
-
 SRCDIR   = "src"
 SRCFILES = map(lambda f: SRCDIR + '/' + f + '.c',
               ["cdbmodule","cdb","cdb_make","cdb_hash",
@@ -13,9 +9,9 @@ from distutils.core import setup, Extension
 
 setup (# Distribution meta-data
         name = "python-cdb",
-        version = "0.32",
+        version = "0.34",
         description = "Interface to constant database files",
-        author = "MJ Pomraning",
+        author = "Mike Pomraning",
         author_email = "mjp@pilcrow.madison.wi.us",
 	license = "GPL",
         long_description = \

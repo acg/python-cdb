@@ -1,6 +1,13 @@
 python-cdb ChangeLog
 MJ Pomraning <mjp@pilcrow.madison.wi.us>
-26 Jan 2002
+04 Sep 2009
+
+04 Sep 2009
+  - Version 0.34
+  - fix crash under 2.5, 2.6 via s/PyMem_DEL/PyObject_Del/g
+    Long overdue.
+    thx: Martin Lesser, Hiroshi Ayukawa, Miroslav Los, Ralf Schmitt,
+         Emiliano Heyns and Akira ODA
 
 26 Jan 2002
   - Version 0.32

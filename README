@@ -1,6 +1,6 @@
-python-cdb 0.32
-MJ Pomraning <mjp@pilcrow.madison.wi.us>
-26 Jan 2002
+python-cdb 0.34
+Mike Pomraning <mjp@pilcrow.madison.wi.us>
+04 Sep 2009
 
 INTRO
 =====
@@ -46,18 +46,23 @@ Consult the docstrings for module, class, and function documentation.
 
 BUGS
 ====
-Bug reports to MJ Pomraning <mjp@pilcrow.madison.wi.us>.
+Bug reports to Mike Pomraning <mjp@pilcrow.madison.wi.us>.
 
 
 TODO
 ====
 
-  - better README/docs
+  - more dict-like API
 
-  - API features new with 2.2 
+  - test cases
+
+  - take advantage of contemporary Python API 
 
   - formal speed benchmarks
 
-  - fix bugs, maybe :)
+  - possibly revert to DJB's cdb implementation
+    explicitly public domain since 2007Q4
 
+  - better README/docs
 
+  - mingw support

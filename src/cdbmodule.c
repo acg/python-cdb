@@ -1,6 +1,6 @@
 /**
-python-cdb 0.32
-Copyright 2001, 2002 Michael J. Pomraning <mjp@pilcrow.madison.wi.us>
+python-cdb 0.34
+Copyright 2001-2009 Michael J. Pomraning <mjp@pilcrow.madison.wi.us>
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -28,7 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #define open_read(x)       (open((x),O_RDONLY|O_NDELAY))
 /* ala djb's open_foo */
 
-#define VERSION     "0.32"
+#define VERSION     "0.34"
 #define CDBVERSION  "0.75"
 
 /* ------------------- cdb object -------------------- */
