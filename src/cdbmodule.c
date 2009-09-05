@@ -655,7 +655,7 @@ cdbo_dealloc(CdbObject *self) {  /* del(cdb_o) */
 
   cdb_free(&self->c);
 
-  PyMem_DEL(self);
+  PyObject_DEL(self);
 }
 
 static PyObject *
@@ -823,7 +823,7 @@ cdbmake_dealloc(cdbmakeobject *self) {
     Py_DECREF(self->fntmp);
   }
 
-  PyMem_DEL(self);
+  PyObject_DEL(self);
 }
 
 static PyObject *
