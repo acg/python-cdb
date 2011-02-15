@@ -25,8 +25,9 @@ objects.''',
         ext_modules = [ Extension(
                             "cdbmodule",
                             SRCFILES,
-                            include_dirs=[ SRCDIR + '/' ]
-                        ) 
+                            include_dirs=[ SRCDIR + '/' ],
+                            extra_compile_args=['-fPIC'],
+                        )
                       ],
         url = "http://pilcrow.madison.wi.us/",
       )
