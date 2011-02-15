@@ -1,0 +1,18 @@
+Source: python-cdb
+Section: admin
+Priority: extra
+Maintainer: Alan Grow <alangrow+pythoncdb@gmail.com>
+Build-depends: debhelper (>= 7), python-support
+Standards-Version: 0.1.0
+Homepage: http://pilcrow.madison.wi.us/#pycdb
+Vcs-Git: https://acg@github.com/acg/python-cdb.git
+
+Package: python-cdb
+Architecture: all
+Section: python
+Build-Depends: python-support (>= 1.0.0), python (>= 2.5)
+Depends: ${misc:Depends}, ${python:Depends}, python (>= 2.5)
+Description: A fast on-disk lookup structure from djb
+  The python-cdb extension module is an adaptation of D. J. Bernstein's
+  constant database package (see http://cr.yp.to/cdb.html).
+
