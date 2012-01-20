@@ -737,6 +737,50 @@ CdbMake_add(cdbmakeobject *self, PyObject *args) {
 }
 
 static PyObject *
+CdbMake_addmany(cdbmakeobject *self, PyObject *args) {
+
+  PyObject *list;
+
+  if (!PyArg_ParseTuple(args,"O!:addmany",&PyList_Type, &list))
+    return NULL;
+
+  Py_ssize_t size = PyList_Size(list);
+  Py_ssize_t i;
+
+  for (i=0; i<size; i++)
+  {
+    PyObject *tuple = PyList_GetItem(list, i);
+    PyObject *key_item;
+    PyObject *data_item;
+
+    if (!PyTuple_Check(tuple)) {
+      PyErr_SetString(PyExc_TypeError, "list of tuples expected");
+      return NULL;
+    }
+
+    if (!(key_item = PyTuple_GetItem(tuple,0)))
+      return NULL;
+
+    if (!(data_item = PyTuple_GetItem(tuple,1)))
+      return NULL;
+
+    char *key, *dat;
+    Py_ssize_t klen, dlen;
+
+    if (PyString_AsStringAndSize(key_item, &key, &klen) < 0)
+      return NULL;
+
+    if (PyString_AsStringAndSize(data_item, &dat, &dlen) < 0)
+      return NULL;
+    
+    if (cdb_make_add(&self->cm, key, klen, dat, dlen) == -1)
+      return CDBMAKEerr;
+  }
+
+  return Py_BuildValue("");
+}
+
+static PyObject *
 CdbMake_finish(cdbmakeobject *self, PyObject *args) {
 
   if (!PyArg_ParseTuple(args, ":finish"))
@@ -767,6 +811,10 @@ static PyMethodDef cdbmake_methods[] = {
 "cm.add(key, data) -> None\n\
 \n\
 Add 'key' -> 'data' pair to the underlying CDB." },
+  {"addmany",    (PyCFunction)CdbMake_addmany,    METH_VARARGS,
+"cm.addmany([(key1,data1),(key2,data2)...]) -> None\n\
+\n\
+Add many 'key' -> 'data' pairs to the underlying CDB." },
   {"finish", (PyCFunction)CdbMake_finish, METH_VARARGS,
 "cm.finish() -> None\n\
 \n\
