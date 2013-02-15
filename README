@@ -1,6 +1,6 @@
-python-cdb 0.34
-Mike Pomraning <mjp@pilcrow.madison.wi.us>
-04 Sep 2009
+python-cdb 0.35
+Alan Grow <alangrow+python-cdb@gmail.com>
+15 Feb 2013
 
 INTRO
 =====
@@ -46,7 +46,7 @@ Consult the docstrings for module, class, and function documentation.
 
 BUGS
 ====
-Bug reports to Mike Pomraning <mjp@pilcrow.madison.wi.us>.
+Bug reports to Alan Grow <alangrow+python-cdb@gmail.com>.
 
 
 TODO

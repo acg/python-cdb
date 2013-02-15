@@ -9,10 +9,10 @@ from distutils.core import setup, Extension
 
 setup (# Distribution meta-data
         name = "python-cdb",
-        version = "0.34",
+        version = "0.35",
         description = "Interface to constant database files",
-        author = "Mike Pomraning",
-        author_email = "mjp@pilcrow.madison.wi.us",
+        author = "Alan Grow",
+        author_email = "alangrow+python-cdb@gmail.com",
 	license = "GPL",
         long_description = \
 '''The python-cdb extension module is an adaptation of D. J. Bernstein's
@@ -29,6 +29,6 @@ objects.''',
                             extra_compile_args=['-fPIC'],
                         )
                       ],
-        url = "http://pilcrow.madison.wi.us/",
+        url = "https://github.com/acg/python-cdb",
       )
 

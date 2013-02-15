@@ -1,6 +1,12 @@
+python-cdb (0.35.0) unstable; urgency=low
+
+  * Version 0.35. New cdb.addmany() function for faster cdb construction. Fix 2.5 build, needed -fPIC.
+
+ -- Alan Grow <agrow+python-cdb@gmail.com>  Fri, 15 Feb 2013 12:25:56 -0700
+
 python-cdb (0.34.0) unstable; urgency=low
   
-  * Initial release
+  * Initial debian package.
    
- -- Alan Grow <alangrow+pythoncdb@gmail.com>  Mon, 14 Feb 2011 19:04:49 -0500
+ -- Alan Grow <alangrow+python-cdb@gmail.com>  Mon, 14 Feb 2011 19:04:49 -0500
 

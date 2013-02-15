@@ -1,6 +1,13 @@
 python-cdb ChangeLog
-MJ Pomraning <mjp@pilcrow.madison.wi.us>
-04 Sep 2009
+Alan Grow <alangrow+python-cdb@gmail.com>
+15 Feb 2013
+
+15 Feb 2013
+  - Version 0.35
+  - New cdb.addmany() function for faster cdb construction
+  - Fix 2.5 build, needed -fPIC
+  - Add debian package
+    thx: Mike Pomraning for 10+ years of python-cdb!
 
 04 Sep 2009
   - Version 0.34
