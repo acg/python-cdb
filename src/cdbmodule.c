@@ -711,11 +711,13 @@ typedef struct {
     struct cdb_make cm;
     PyObject * fn;
     PyObject * fntmp;
+    char finished;
 } cdbmakeobject;
 
 staticforward PyTypeObject CdbMakeType;
 
 #define CDBMAKEerr PyErr_SetFromErrno(PyExc_IOError)
+#define CDBMAKEfinished PyErr_SetString(CDBError, "cdbmake object already finished")
 
 
 /* ----------------- CdbMake methods ------------------ */
@@ -728,6 +730,11 @@ CdbMake_add(cdbmakeobject *self, PyObject *args) {
 
   if (!PyArg_ParseTuple(args,"s#s#:add",&key,&klen,&dat,&dlen))
     return NULL;
+
+  if (self->finished) {
+    CDBMAKEfinished;
+    return NULL;
+  }
 
   if (cdb_make_add(&self->cm, key, klen, dat, dlen) == -1)
     return CDBMAKEerr;
@@ -743,6 +750,11 @@ CdbMake_addmany(cdbmakeobject *self, PyObject *args) {
 
   if (!PyArg_ParseTuple(args,"O!:addmany",&PyList_Type, &list))
     return NULL;
+
+  if (self->finished) {
+    CDBMAKEfinished;
+    return NULL;
+  }
 
   Py_ssize_t size = PyList_Size(list);
   Py_ssize_t i;
@@ -785,6 +797,12 @@ CdbMake_finish(cdbmakeobject *self, PyObject *args) {
 
   if (!PyArg_ParseTuple(args, ":finish"))
     return NULL;
+
+  if (self->finished) {
+    CDBMAKEfinished;
+    return NULL;
+  }
+  self->finished = 1;
 
   if (cdb_make_finish(&self->cm) == -1)
     return CDBMAKEerr;
@@ -848,6 +866,8 @@ new_cdbmake(PyObject *ignore, PyObject *args) {
 
   self->fntmp = fntmp;
   Py_INCREF(fntmp);
+
+  self->finished = 0;
 
   if (cdb_make_start(&self->cm, f) == -1) {
     Py_DECREF(self);
