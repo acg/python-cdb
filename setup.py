@@ -30,5 +30,8 @@ objects.''',
                         )
                       ],
         url = "https://github.com/acg/python-cdb",
+        classifiers=[
+            'Programming Language :: Python',
+            'Programming Language :: Python :: 2',
+        ],
       )
-
