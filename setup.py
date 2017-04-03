@@ -23,7 +23,7 @@ fast lookups and atomic updates.  This module mimics the normal
 cdb utilities, cdb(get|dump|make), via convenient, high-level Python
 objects.''',
         ext_modules = [ Extension(
-                            "cdbmodule",
+                            "cdb",
                             SRCFILES,
                             include_dirs=[ SRCDIR + '/' ],
                             extra_compile_args=['-fPIC'],
