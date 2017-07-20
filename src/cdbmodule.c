@@ -126,6 +126,44 @@ cdb_pyread(CdbObject *cdb_o, unsigned int len, uint32 pos) {
 
 }
 
+static PyObject *
+cdb_pyreadi(CdbObject *cdb_o, uint32 pos) {
+  struct cdb *c;
+  PyObject *i = NULL;
+
+  c = &cdb_o->c;
+
+  if (c->map) {
+    if ((pos > c->size) || (c->size - pos < sizeof(int)))
+      goto FORMAT;
+    i = PyInt_FromLong(*(int *)(c->map + pos));
+  } else {
+    if (lseek(c->fd,pos,SEEK_SET) == -1) goto ERRNO;
+    int buf, r;
+    do {
+      Py_BEGIN_ALLOW_THREADS
+      r = read(c->fd,(char *)&buf,sizeof(int));
+      Py_END_ALLOW_THREADS
+    }
+    while ((r == -1) && (errno == EINTR));
+    if (r == -1) goto ERRNO;
+    if (r == 0) goto FORMAT;
+    i = PyInt_FromLong(buf);
+  }
+
+  return i;
+
+  FORMAT:
+  Py_XDECREF(i);
+  PyErr_SetFromErrno(PyExc_RuntimeError);
+  return NULL;
+
+  ERRNO:
+  Py_XDECREF(i);
+  return CDBerr;
+
+}
+
 
 #define CDBO_CURDATA(x) (cdb_pyread(x, x->c.dlen, x->c.dpos))
 
@@ -195,6 +233,36 @@ cdbo_get(CdbObject *self, PyObject *args) {
     return NULL;
 
   return CDBO_CURDATA(self);
+}
+
+static PyObject *
+cdbo_geti(CdbObject *self, PyObject *args) {
+
+  char * key;
+  unsigned int klen;
+  int r;
+  int i = 0;
+
+  if (!PyArg_ParseTuple(args, "s#|i:get", &key, &klen, &i))
+    return NULL;
+
+  cdb_findstart(&self->c);
+
+  for (;;) {
+    r = cdb_findnext(&self->c, key, klen);
+    if (r == -1) return CDBerr;
+    if (!r) return Py_BuildValue("");
+    if (!i) break;
+    --i;
+  }
+
+  /* prep. possibly ensuing call to getnext() */
+  Py_XDECREF(self->getkey);
+  self->getkey = PyString_FromStringAndSize(key, klen);
+  if (self->getkey == NULL)
+    return NULL;
+
+  return cdb_pyreadi(self, self->c.dpos);
 }
 
 static char cdbo_getall_doc[] =
@@ -560,6 +628,8 @@ static PyMethodDef cdb_methods[] = {
 
   {"get",      (PyCFunction)cdbo_get,      METH_VARARGS,
                cdbo_get_doc },
+  {"geti",      (PyCFunction)cdbo_geti,      METH_VARARGS,
+               cdbo_get_doc },
   {"getnext",  (PyCFunction)cdbo_getnext,  METH_VARARGS,
                cdbo_getnext_doc },
   {"getall",   (PyCFunction)cdbo_getall,   METH_VARARGS,
@@ -744,6 +814,28 @@ CdbMake_add(cdbmakeobject *self, PyObject *args) {
 }
 
 static PyObject *
+CdbMake_addi(cdbmakeobject *self, PyObject *args) {
+  
+  char * key;
+  unsigned int klen;
+  int dat;
+  
+  if (!PyArg_ParseTuple(args,"s#i:add",&key,&klen,&dat))
+    return NULL;
+  
+  if (self->finished) {
+    CDBMAKEfinished;
+    return NULL;
+  }
+  
+  if (cdb_make_add(&self->cm, key, klen, (char *)&dat, sizeof(dat)) == -1)
+    return CDBMAKEerr;
+  
+  return Py_BuildValue("");
+
+}
+
+static PyObject *
 CdbMake_addmany(cdbmakeobject *self, PyObject *args) {
 
   PyObject *list;
@@ -829,6 +921,10 @@ static PyMethodDef cdbmake_methods[] = {
 "cm.add(key, data) -> None\n\
 \n\
 Add 'key' -> 'data' pair to the underlying CDB." },
+  {"addi",    (PyCFunction)CdbMake_addi,    METH_VARARGS,
+"cm.addi(key, data) -> None\n\
+\n\
+Add 'key' -> 'data' pair to the underlying CDB. data is an integer" },
   {"addmany",    (PyCFunction)CdbMake_addmany,    METH_VARARGS,
 "cm.addmany([(key1,data1),(key2,data2)...]) -> None\n\
 \n\
