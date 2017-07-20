@@ -1,0 +1,4 @@
+build/
+cdb.so
+python_cdb.egg-info/
+*.swp
