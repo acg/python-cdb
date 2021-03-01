@@ -24,8 +24,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #include <fcntl.h>
 #include "cdb.h"
 #include "cdb_make.h"
+#include "unicode.h"
 
-#define open_read(x)       (open((x),O_RDONLY|O_NDELAY))
 /* ala djb's open_foo */
 
 #define VERSION     "0.35"
@@ -62,7 +62,7 @@ A CDB object 'cdb_o' offers the following interesting attributes:\n\
   __length__:\n\
     len(cdb_o) returns the total number of items in a cdb,\n\
     which may or may not exceed the number of distinct keys.\n";
-  
+
 
 typedef struct {
     PyObject_HEAD
@@ -75,55 +75,55 @@ typedef struct {
     uint32 numrecords;
 } CdbObject;
 
-staticforward PyTypeObject CdbType;
+static PyTypeObject CdbType;
 
 PyObject * CDBError;
 #define CDBerr PyErr_SetFromErrno(CDBError)
 
 static PyObject *
 cdb_pyread(CdbObject *cdb_o, unsigned int len, uint32 pos) {
-  struct cdb *c;
-  PyObject *s = NULL;
+    struct cdb *c;
+    PyObject *s = NULL;
 
-  c = &cdb_o->c;
+    c = &cdb_o->c;
 
-  if (c->map) {
-    if ((pos > c->size) || (c->size - pos < len))
-      goto FORMAT;
-    s = PyString_FromStringAndSize(c->map + pos, len);
-  } else {
-    s = PyString_FromStringAndSize(NULL, len);
-    if (s == NULL)
-      return NULL;
-    if (lseek(c->fd,pos,SEEK_SET) == -1) goto ERRNO;
-    while (len > 0) {
-      int r;
-      char * buf = PyString_AsString(s);
-
-      do {
-        Py_BEGIN_ALLOW_THREADS
-        r = read(c->fd,buf,len);
-        Py_END_ALLOW_THREADS
-      }
-      while ((r == -1) && (errno == EINTR));
-      if (r == -1) goto ERRNO;
-      if (r == 0) goto FORMAT;
-      buf += r;
-      len -= r;
+    if (c->map) {
+        if ((pos > c->size) || (c->size - pos < len))
+            goto FORMAT;
+        s = PyUnicode_FromStringAndSize(c->map + pos, len);
+    } else {
+        s = PyUnicode_FromStringAndSize(NULL, len);
+        if (s == NULL)
+            return NULL;
+        if (lseek(c->fd,pos,SEEK_SET) == -1) goto ERRNO;
+        while (len > 0) {
+            int r;
+            PyObject* ascii_array = PyUnicode_AsASCIIString(s);
+            if (ascii_array == NULL)
+                return NULL; // cant be converted to ascii
+            char * buf = PyByteArray_AsString(ascii_array);
+            do {
+                Py_BEGIN_ALLOW_THREADS
+                r = read(c->fd,buf,len);
+                Py_END_ALLOW_THREADS
+            }
+            while ((r == -1) && (errno == EINTR));
+            if (r == -1) goto ERRNO;
+            if (r == 0) goto FORMAT;
+            buf += r;
+            len -= r;
+        }
     }
-  }
+    return s;
 
-  return s;
+    FORMAT:
+    Py_XDECREF(s);
+    PyErr_SetFromErrno(PyExc_RuntimeError);
+    return NULL;
 
-  FORMAT:
-  Py_XDECREF(s);
-  PyErr_SetFromErrno(PyExc_RuntimeError);
-  return NULL;
-
-  ERRNO:
-  Py_XDECREF(s);
-  return CDBerr;
-
+    ERRNO:
+    Py_XDECREF(s);
+    return CDBerr;
 }
 
 
@@ -144,7 +144,7 @@ cdbo_has_key(CdbObject *self, PyObject *args) {
   unsigned int klen;
   int r;
 
-  if (!PyArg_ParseTuple(args, "s#", &key, &klen))
+  if (!PyArg_ParseTuple(args, "s", &key, &klen))
     return NULL;
 
   r = cdb_find(&self->c, key, klen);
@@ -190,7 +190,7 @@ cdbo_get(CdbObject *self, PyObject *args) {
 
   /* prep. possibly ensuing call to getnext() */
   Py_XDECREF(self->getkey);
-  self->getkey = PyString_FromStringAndSize(key, klen);
+  self->getkey = PyUnicode_FromStringAndSize(key, klen);
   if (self->getkey == NULL)
     return NULL;
 
@@ -263,14 +263,20 @@ cdbo_getnext(CdbObject *self, PyObject *args) {
     return NULL;
 
   if (self->getkey == NULL) {
-    PyErr_SetString(PyExc_TypeError, 
+    PyErr_SetString(PyExc_TypeError,
                     "getnext() called without first calling get()");
     return NULL;
   }
 
-  switch(cdb_findnext(&self->c, 
-                      PyString_AsString(self->getkey), 
-                      PyString_Size(self->getkey))) {
+  PyObject* byte_array = PyUnicode_AsASCIIString(self->getkey);
+  if (byte_array == NULL) {
+      PyErr_SetString(PyExc_UnicodeDecodeError,
+                      "could not convert self->getkey to ascii string");
+      return NULL;
+  }
+  switch(cdb_findnext(&self->c,
+                      PyByteArray_AsString(byte_array),
+                      PyByteArray_Size(byte_array))) {
     case -1:
       return CDBerr;
     case  0:
@@ -330,27 +336,37 @@ _cdbo_keyiter(CdbObject *self) {
     if (key == NULL)
       return NULL;
 
-    switch(cdb_find(&self->c,PyString_AsString(key),PyString_Size(key))) {
+    char* mb_key = NULL;
+    if (pyunicode_to_multibyte_string(key, &mb_key) < 0) {
+        free(mb_key);
+        return NULL;
+    }
+    switch(cdb_find(&self->c,mb_key,strlen(mb_key))) {
       case -1:
         Py_DECREF(key);
         key = NULL;
+        free(mb_key);
         return CDBerr;
       case 0:
         /* bizarre, impossible? PyExc_RuntimeError? */
-        PyErr_SetString(PyExc_KeyError, 
-                        PyString_AS_STRING((PyStringObject *) key));
+        PyErr_SetString(PyExc_KeyError,
+                        mb_key); // warning
         Py_DECREF(key);
         key = NULL;
       default:
-        if (key == NULL)  /* already raised error */
-          return NULL;
+        if (key == NULL) {   /* already raised error */
+            free(mb_key);
+            return NULL;
+        }
 
         if (cdb_datapos(&self->c) == self->iter_pos + klen + 8) {
           /** first occurrence of key in the cdb **/
           self->iter_pos += 8 + klen + dlen;
+          free(mb_key);
           return key;
         }
         Py_DECREF(key);   /* better luck next time around */
+        free(mb_key);
         self->iter_pos += 8 + klen + dlen;
     }
   }
@@ -531,6 +547,7 @@ cdbo_length(CdbObject *self) {
 
 static PyObject *
 cdbo_subscript(CdbObject *self, PyObject *k) {
+    char* mb_key = NULL;
   char * key;
   int klen;
 
@@ -541,8 +558,12 @@ cdbo_subscript(CdbObject *self, PyObject *k) {
     case -1:
       return CDBerr;
     case 0:
-      PyErr_SetString(PyExc_KeyError, 
-                      PyString_AS_STRING((PyStringObject *) k));
+        if (pyunicode_to_multibyte_string(k, &mb_key) < 0) {
+            PyErr_SetString(PyExc_KeyError, "Couldn't convert key to multibyte encoding.");
+            return NULL;
+        }
+      PyErr_SetString(PyExc_KeyError, mb_key);
+        free(mb_key);
       return NULL;
     default:
       return CDBO_CURDATA(self);
@@ -551,12 +572,12 @@ cdbo_subscript(CdbObject *self, PyObject *k) {
 }
 
 static PyMappingMethods cdbo_as_mapping = {
-	(inquiry)cdbo_length,
+	(lenfunc)cdbo_length,
 	(binaryfunc)cdbo_subscript,
 	(objobjargproc)0
 };
 
-static PyMethodDef cdb_methods[] = { 
+static PyMethodDef cdb_methods[] = {
 
   {"get",      (PyCFunction)cdbo_get,      METH_VARARGS,
                cdbo_get_doc },
@@ -564,7 +585,7 @@ static PyMethodDef cdb_methods[] = {
                cdbo_getnext_doc },
   {"getall",   (PyCFunction)cdbo_getall,   METH_VARARGS,
                cdbo_getall_doc },
-  {"has_key",  (PyCFunction)cdbo_has_key,  METH_VARARGS, 
+  {"has_key",  (PyCFunction)cdbo_has_key,  METH_VARARGS,
                cdbo_has_key_doc },
   {"keys",     (PyCFunction)cdbo_keys,     METH_VARARGS,
                cdbo_keys_doc },
@@ -607,25 +628,35 @@ cdbo_constructor(PyObject *ignore, PyObject *args) {
   PyObject *f;
   PyObject *name_attr = Py_None;
   int fd;
+  char* mb_filename = NULL;
 
   if (! PyArg_ParseTuple(args, "O:new", &f))
     return NULL;
 
-  if (PyString_Check(f)) {
+  if (PyUnicode_Check(f)) {
 
-    if ((fd = open_read(PyString_AsString(f))) == -1)
+    if(pyunicode_to_multibyte_string(f, &mb_filename) < 0) {
+        PyErr_SetString(PyExc_TypeError,
+                        "could not convert filename to multibyte string");
+        free(mb_filename);
+        return NULL;
+    }
+    printf("%s\n", mb_filename);
+    fd = open(mb_filename, O_RDONLY|O_NDELAY);
+    free(mb_filename);
+    if (fd == -1)
       return CDBerr;
 
     name_attr = f;
 
-  } else if (PyInt_Check(f)) {
+  } else if (PyLong_Check(f)) {
 
-    fd = (int) PyInt_AsLong(f);
+    fd = (int) PyLong_AsLong(f);
 
   } else {
 
     PyErr_SetString(PyExc_TypeError,
-                    "expected filename or file descriptor");
+                    "expected filename (str) or file descriptor (int)");
     return NULL;
 
   }
@@ -645,7 +676,7 @@ cdbo_dealloc(CdbObject *self) {  /* del(cdb_o) */
   if (self->name_py != NULL) {
 
     /* if cdb_o.name is not None:  we open()d it ourselves, so close it */
-    if (PyString_Check(self->name_py))
+    if (PyUnicode_Check(self->name_py))
       close(self->c.fd);
 
     Py_DECREF(self->name_py);
@@ -663,7 +694,7 @@ cdbo_getattr(CdbObject *self, char *name) {
 
   PyObject * r;
 
-  r = Py_FindMethod(cdb_methods, (PyObject *) self, name);
+  r = PyObject_GenericGetAttr((PyObject *) self, PyUnicode_FromString(name));
 
   if (r != NULL)
     return r;
@@ -675,18 +706,18 @@ cdbo_getattr(CdbObject *self, char *name) {
 
   if (!strcmp(name,"fd")) {
     return Py_BuildValue("i", self->c.fd);  /* cdb_o.fd */
-  } 
+  }
 
   if (!strcmp(name,"name")) {
     Py_INCREF(self->name_py);
     return self->name_py;                   /* cdb_o.name */
-  } 
+  }
 
   if (!strcmp(name,"size")) {               /* cdb_o.size */
     return self->c.map ?  /** mmap()d ? stat.st_size : None **/
            Py_BuildValue("l", (long) self->c.size) :
            Py_BuildValue("");
-  } 
+  }
 
   PyErr_SetString(PyExc_AttributeError, name);
   return NULL;
@@ -714,7 +745,7 @@ typedef struct {
     char finished;
 } cdbmakeobject;
 
-staticforward PyTypeObject CdbMakeType;
+static PyTypeObject CdbMakeType;
 
 #define CDBMAKEerr PyErr_SetFromErrno(PyExc_IOError)
 #define CDBMAKEfinished PyErr_SetString(CDBError, "cdbmake object already finished")
@@ -776,17 +807,31 @@ CdbMake_addmany(cdbmakeobject *self, PyObject *args) {
     if (!(data_item = PyTuple_GetItem(tuple,1)))
       return NULL;
 
-    char *key, *dat;
     Py_ssize_t klen, dlen;
 
-    if (PyString_AsStringAndSize(key_item, &key, &klen) < 0)
-      return NULL;
+    PyObject* key_array = PyUnicode_AsASCIIString(key_item);
+    PyObject* data_array = PyUnicode_AsASCIIString(data_item);
+    if (key_array == NULL || data_array == NULL) {
+        Py_XDECREF(key_array);
+        Py_XDECREF(data_array);
+        return NULL;
+    }
 
-    if (PyString_AsStringAndSize(data_item, &dat, &dlen) < 0)
-      return NULL;
-    
-    if (cdb_make_add(&self->cm, key, klen, dat, dlen) == -1)
-      return CDBMAKEerr;
+    klen = PyByteArray_Size(key_array);
+    dlen = PyByteArray_Size(data_array);
+
+    if (!klen || !dlen) {
+        Py_XDECREF(key_array);
+        Py_XDECREF(data_array);
+        return NULL;
+    }
+
+
+      if (cdb_make_add(&self->cm, PyByteArray_AsString(key_array), klen, PyByteArray_AsString(data_array), dlen) == -1) {
+          Py_XDECREF(key_array);
+          Py_XDECREF(data_array);
+          return CDBMAKEerr;
+      }
   }
 
   return Py_BuildValue("");
@@ -817,8 +862,8 @@ CdbMake_finish(cdbmakeobject *self, PyObject *args) {
 
   self->cm.fp = NULL;
 
-  if (rename(PyString_AsString(self->fntmp),
-             PyString_AsString(self->fn))    == -1)
+  if (rename(PyBytes_AsString(self->fntmp),
+             PyBytes_AsString(self->fn))    == -1)
     return CDBMAKEerr;
 
   return Py_BuildValue("");
@@ -853,7 +898,7 @@ new_cdbmake(PyObject *ignore, PyObject *args) {
   if (! PyArg_ParseTuple(args, "SS|i", &fn, &fntmp))
     return NULL;
 
-  f = fopen(PyString_AsString(fntmp), "w+b");
+  f = fopen(PyBytes_AsString(fntmp), "w+b");
   if (f == NULL) {
     return CDBMAKEerr;
   }
@@ -886,7 +931,7 @@ cdbmake_dealloc(cdbmakeobject *self) {
   if (self->fntmp != NULL) {
     if (self->cm.fp != NULL) {
       fclose(self->cm.fp);
-      unlink(PyString_AsString(self->fntmp));
+      unlink(PyBytes_AsString(self->fntmp));
     }
     Py_DECREF(self->fntmp);
   }
@@ -916,65 +961,34 @@ cdbmake_getattr(cdbmakeobject *self, char *name) {
   if (!strcmp(name,"numentries"))
     return Py_BuildValue("l", self->cm.numentries); /* self.numentries */
 
-  return Py_FindMethod(cdbmake_methods, (PyObject *) self, name);
+  return PyObject_GenericGetAttr((PyObject *) self, PyUnicode_FromString(name));
 }
 
 /* ---------------- Type delineation -------------------- */
 
-statichere PyTypeObject CdbType = {
+static PyTypeObject CdbType = {
         /* The ob_type field must be initialized in the module init function
          * to be portable to Windows without using C++. */
         PyObject_HEAD_INIT(NULL)
-        0,                      /*ob_size*/
-        "cdb",              /*tp_name*/
-        sizeof(CdbObject),  /*tp_basicsize*/
-        0,                      /*tp_itemsize*/
-        /* methods */
-        (destructor)cdbo_dealloc, /*tp_dealloc*/
-        0,                      /*tp_print*/
-        (getattrfunc)cdbo_getattr, /*tp_getattr*/
-        0,                      /*tp_setattr*/
-        0,                      /*tp_compare*/
-        0,                      /*tp_repr*/
-        0,                      /*tp_as_number*/
-        0,                      /*tp_as_sequence*/
-        &cdbo_as_mapping,       /*tp_as_mapping*/
-        0,                      /*tp_hash*/
-        0,                      /*tp_call*/
-        0,                      /*tp_str*/
-        0,                      /*tp_getattro*/
-        0,                      /*tp_setattro*/
-        0,                      /*tp_as_buffer*/
-        0,                      /*tp_xxx4*/
-        cdbo_object_doc,        /*tp_doc*/
+        .tp_name = "cdb",
+        .tp_basicsize = sizeof(CdbObject),
+        .tp_dealloc = (destructor)cdbo_dealloc,
+        .tp_getattr = (getattrfunc)cdbo_getattr,
+        .tp_as_mapping = &cdbo_as_mapping,
+        .tp_doc = cdbo_object_doc,
+        .tp_methods = cdb_methods,
 };
 
-statichere PyTypeObject CdbMakeType = {
+static PyTypeObject CdbMakeType = {
         /* The ob_type field must be initialized in the module init function
          * to be portable to Windows without using C++. */
         PyObject_HEAD_INIT(NULL)
-        0,                      /*ob_size*/
-        "cdbmake",              /*tp_name*/
-        sizeof(cdbmakeobject),  /*tp_basicsize*/
-        0,                      /*tp_itemsize*/
-        /* methods */
-        (destructor)cdbmake_dealloc, /*tp_dealloc*/
-        0,                      /*tp_print*/
-        (getattrfunc)cdbmake_getattr, /*tp_getattr*/
-        0,                      /*tp_setattr*/
-        0,                      /*tp_compare*/
-        0,                      /*tp_repr*/
-        0,                      /*tp_as_number*/
-        0,                      /*tp_as_sequence*/
-        0,                      /*tp_as_mapping*/
-        0,                      /*tp_hash*/
-        0,                      /*tp_call*/
-        0,                      /*tp_str*/
-        0,                      /*tp_getattro*/
-        0,                      /*tp_setattro*/
-        0,                      /*tp_as_buffer*/
-        0,                      /*tp_xxx4*/
-        cdbmake_object_doc,     /*tp_doc*/
+        .tp_name = "cdbmake",
+        .tp_basicsize = sizeof(cdbmakeobject),
+        .tp_dealloc = (destructor)cdbmake_dealloc,
+        .tp_getattr = (getattrfunc)cdbmake_getattr,
+        .tp_doc = cdbmake_object_doc,
+        .tp_methods = cdbmake_methods,
 };
 
 /* ---------------- exported functions ------------------ */
@@ -1030,24 +1044,38 @@ atomic replacement of CDBs.\n\
 \n\
 This module defines a new Exception \"error\".";
 
-DL_EXPORT(void)
-initcdb() {
-  PyObject *m, *d, *v;
+static struct PyModuleDef cdbmodule = {
+        PyModuleDef_HEAD_INIT,
+        .m_name = "cdb",
+        .m_doc = module_doc,
+        .m_size = -1,
+        .m_methods = module_functions
+};
 
-  CdbType.ob_type = &PyType_Type;
-  CdbMakeType.ob_type = &PyType_Type;
+PyMODINIT_FUNC PyInit_cdb() {
+    PyObject *m, *d, *v;
 
-  m = Py_InitModule3("cdb", module_functions, module_doc);
+    //  CdbType.ob_type = &PyType_Type;
+    //  CdbMakeType.ob_type = &PyType_Type;
 
-  d = PyModule_GetDict(m);
+    m = PyModule_Create(&cdbmodule);
 
-  CDBError = PyErr_NewException("cdb.error", NULL, NULL);
-  PyDict_SetItemString(d, "error", CDBError);
+    d = PyModule_GetDict(m);
 
-  PyDict_SetItemString(d, "__version__", 
-                       v = PyString_FromString(VERSION));
-  PyDict_SetItemString(d, "__cdb_version__",
-                       v = PyString_FromString(CDBVERSION));
-  Py_XDECREF(v);
+    CDBError = PyErr_NewException("cdb.error", NULL, NULL);
+    Py_XINCREF(CDBError);
+    if (PyModule_AddObject(m, "error", CDBError) < 0) {
+        Py_XDECREF(CDBError);
+        Py_CLEAR(CDBError);
+        Py_DECREF(CDBError);
+        return NULL;
+    }
 
+    PyDict_SetItemString(d, "__version__",
+                       v = PyUnicode_FromString(VERSION));
+    PyDict_SetItemString(d, "__cdb_version__",
+                       v = PyUnicode_FromString(CDBVERSION));
+    Py_XDECREF(v);
+
+    return m;
 }
